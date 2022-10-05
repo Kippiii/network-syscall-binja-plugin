@@ -25,6 +25,53 @@ class Syscall:
         bv.set_comment_at(self.addr, str(self))
 
 
+class SocketSyscall(Syscall):
+    domain: int
+    type: int
+    protocol: int
+
+
+class BindSyscall(Syscall):
+    sock_id: int
+    sock_addr: int
+    sock_addr_len: int
+
+
+class ListenSyscall(Syscall):
+    sock_id: int
+    backlog: int
+
+
+class AcceptSyscall(Syscall):
+    sock_id: int
+    sock_addr: int
+    sock_addr_len: int
+
+
+class ConnectSyscall(Syscall):
+    sock_id: int
+    sock_addr: int
+    sock_addr_len: int
+
+
+class SendSyscall(Syscall):
+    sock_id: int
+    buffer: int
+    buffer_len: int
+    flags: int
+    dest_addr: int
+    dest_addr_len: int
+
+
+class RecvSyscall(Syscall):
+    sock_id: int
+    buffer: int
+    buffer_len: int
+    flags: int
+    src_addr: int
+    src_addr_len: int
+
+
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
     insts = []
     for function in bv.functions:
