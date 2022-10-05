@@ -9,15 +9,20 @@ class NotNetworkSyscallException(Exception):
 class Syscall:
     num: int
     args: List[int]
+    addr: int
 
-    def __init__(self, inst: LowLevelILInstruction):
-        pass
+    @classmethod
+    def create(cls, inst: LowLevelILInstruction) -> "Syscall":
+        return Syscall(inst.address)
+
+    def __init__(self, addr: int):
+        self.addr = addr
 
     def __str__(self) -> str:
-        pass
+        return "This is a comment"
 
-    def add_comment(self) -> None:
-        pass
+    def add_comment(self, bv) -> None:
+        bv.set_comment_at(self.addr, str(self))
 
 
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
@@ -34,7 +39,7 @@ def gen_syscalls(insts: List[LowLevelILInstruction]) -> List[Syscall]:
     syscalls = []
     for i in insts:
         try:
-            syscalls.append(Syscall(i))
+            syscalls.append(Syscall.create(i))
         except NotNetworkSyscallException:
             pass
     return syscalls
@@ -46,7 +51,7 @@ def update_syscalls(bv):
     syscalls = gen_syscalls(insts)
 
     for syscall in syscalls:
-        syscall.add_comment()
+        syscall.add_comment(bv)
 
 
 PluginCommand.register("Network Syscalls", "Traces all network syscalls", update_syscalls)
