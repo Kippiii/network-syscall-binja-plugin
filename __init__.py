@@ -3,8 +3,10 @@ from typing import List
 from binaryninja.plugin import PluginCommand
 from binaryninja import LowLevelILOperation, LowLevelILInstruction
 
+
 class NotNetworkSyscallException(Exception):
     pass
+
 
 class Syscall:
     num: int
@@ -32,44 +34,39 @@ class SocketSyscall(Syscall):
 
 
 class BindSyscall(Syscall):
-    sock_id: int
-    sock_addr: int
+    ip_addr: str
+    port: int
     sock_addr_len: int
 
 
 class ListenSyscall(Syscall):
-    sock_id: int
     backlog: int
 
 
 class AcceptSyscall(Syscall):
-    sock_id: int
-    sock_addr: int
+    ip_addr: str
+    port: int
     sock_addr_len: int
 
 
 class ConnectSyscall(Syscall):
-    sock_id: int
-    sock_addr: int
+    ip_addr: str
+    port: int
     sock_addr_len: int
 
 
 class SendSyscall(Syscall):
-    sock_id: int
-    buffer: int
-    buffer_len: int
+    ip_addr: str
+    port: int
+    data: str
     flags: int
-    dest_addr: int
-    dest_addr_len: int
 
 
 class RecvSyscall(Syscall):
-    sock_id: int
-    buffer: int
-    buffer_len: int
+    ip_addr: str
+    port: int
+    data: str
     flags: int
-    src_addr: int
-    src_addr_len: int
 
 
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
