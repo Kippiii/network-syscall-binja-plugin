@@ -8,10 +8,23 @@ class NotNetworkSyscallException(Exception):
     pass
 
 
+def get_reg_value(inst: LowLevelILInstruction, reg_name: str) -> int:
+    reg = inst.get_reg_value(reg_name)
+    # assert reg.type == 2, f"Given reg type of {reg.type} is unsupported here"
+    return reg.value
+
+
+def get_referenced_reg_value(inst: LowLevelILInstruction, reg_name: str, size: int) -> int:
+    reg = inst.get_reg_value(reg_name)
+    # assert reg.type == 5, f"Given reg type of {reg.type} is unsupported here"
+    return inst.get_stack_contents(reg.value, size).value
+
+
 def parse_sockaddr(value: int) -> Tuple[int, int, str]:
     family = value & 0xf
-    port = (value & 0xff00) >> 8
-    ip = f"{(value & 0xff0000) >> 16}.{(value & 0xff000000) >> 24}.{(value & 0xff00000000) >> 32}.{(value & 0xff0000000000) >> 40}"
+    port = (value & 0xffff0000) >> 16
+    port = (port % 0x100 * 0x100) + (port // 0x100)
+    ip = f"{(value & 0xff00000000) >> 32}.{(value & 0xff0000000000) >> 40}.{(value & 0xff000000000000) >> 56}.{(value & 0xff00000000000000) >> 72}"
     return family, port, ip
 
 
@@ -31,12 +44,10 @@ class Syscall:
             46: SendSyscall,
             47: RecvSyscall,
         }
-        sys_num = inst.get_reg_value("rax").value
+        sys_num = get_reg_value(inst, "rax")
         if sys_num not in syscall_map:
             raise NotNetworkSyscallException
-        regs = ["rdi", "rsi", "edx", "r10", "r8", "r9"]
-        args = [inst.get_reg_value(reg) for reg in regs]
-        syscall = syscall_map[sys_num](args)
+        syscall = syscall_map[sys_num](inst)
         syscall.addr = inst.address
         return syscall
 
@@ -56,10 +67,10 @@ class SocketSyscall(Syscall):
     type: int
     protocol: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
-        self.domain = args[0].value
-        self.type = args[1].value
-        self.protocol = args[2].value
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        self.domain = get_reg_value(inst, "rdi")
+        self.type = get_reg_value(inst, "rsi")
+        self.protocol = get_reg_value(inst, "rdx")
 
     def __str__(self) -> str:
         return f"socket({self.domain}, {self.type}, {self.protocol})"
@@ -70,8 +81,10 @@ class BindSyscall(Syscall):
     ip_addr: str
     port: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
-        self.family, self.port, self.ip_addr = parse_sockaddr(args[1].value)
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        size = get_reg_value(inst, "rdx")
+        value = get_referenced_reg_value(inst, "rsi", size)
+        self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
         return f"bind({self.family}, {self.port}, {self.ip_addr})"
@@ -80,8 +93,8 @@ class BindSyscall(Syscall):
 class ListenSyscall(Syscall):
     backlog: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
-        self.backlog = args[1].value
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        self.backlog = get_referenced_reg_value(inst, "rsi", 4)
 
     def __str__(self) -> str:
         return f"listen({self.backlog})"
@@ -92,8 +105,10 @@ class AcceptSyscall(Syscall):
     ip_addr: str
     port: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
-        self.family, self.port, self.ip_addr = parse_sockaddr(args[1].value)
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        size = get_reg_value(inst, "rdx")
+        value = get_referenced_reg_value(inst, "rsi", size)
+        self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
         return f"accept({self.family}, {self.port}, {self.ip_addr})"
@@ -104,8 +119,10 @@ class ConnectSyscall(Syscall):
     ip_addr: str
     port: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
-        self.family, self.port, self.ip_addr = parse_sockaddr(args[1].value)
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        size = get_reg_value(inst, "rdx")
+        value = get_referenced_reg_value(inst, "rsi", size)
+        self.family, self.port, self.ip_addr = parse_sockaddr(value)
     
     def __str__(self) -> str:
         return f"connect({self.family}, {self.port}, {self.ip_addr})"
@@ -117,7 +134,7 @@ class SendSyscall(Syscall):
     data: str
     flags: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
+    def __init__(self, inst: LowLevelILInstruction) -> None:
         pass
     
     def __str__(self) -> str:
@@ -130,7 +147,7 @@ class RecvSyscall(Syscall):
     data: str
     flags: int
 
-    def __init__(self, args: List[RegisterValue]) -> None:
+    def __init__(self, inst: LowLevelILInstruction) -> None:
         pass
 
     def __str__(self) -> str:
