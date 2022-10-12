@@ -89,7 +89,8 @@ class BindSyscall(Syscall):
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
-        return f"Bound to Port {self.port}"
+        port_str = self.port if self.port != -1 else "Unknown"
+        return f"Bound to Port {port_str}"
 
 
 class ListenSyscall(Syscall):
@@ -113,7 +114,8 @@ class AcceptSyscall(Syscall):
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
-        return f"Accepting on Port {self.port}"
+        port_str = self.port if self.port != -1 else "Unknown"
+        return f"Accepting on Port {port_str}"
 
 
 class ConnectSyscall(Syscall):
@@ -127,7 +129,8 @@ class ConnectSyscall(Syscall):
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
     
     def __str__(self) -> str:
-        return f"Connecting on Port {self.port}"
+        port_str = self.port if self.port != -1 else "Unknown"
+        return f"Connecting on Port {port_str}"
 
 
 class SendSyscall(Syscall):
