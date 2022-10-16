@@ -42,8 +42,8 @@ class Syscall:
             50: ListenSyscall,
             43: AcceptSyscall,
             42: ConnectSyscall,
-            46: SendSyscall,
-            47: RecvSyscall,
+            44: SendToSyscall,
+            45: RecvFromSyscall,
         }
         sys_num = get_reg_value(inst, "rax")
         if sys_num not in syscall_map:
@@ -133,30 +133,36 @@ class ConnectSyscall(Syscall):
         return f"Connecting on Port {port_str}"
 
 
-class SendSyscall(Syscall):
+class SendToSyscall(Syscall):
+    family: int
     ip_addr: str
     port: int
     data: str
-    flags: int
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
-        pass
+        buffer_size = get_reg_value(inst, "rdx")
+        buffer = get_reg_value(inst, "rsi", buffer_size)
+        size = get_reg_value(inst, "r9")
+        value = get_reg_value(inst, "r8", size)
+        self.family, self.port, self.ip_addr = parse_sockaddr(value)
+        self.data = ''.join([chr((buffer // (16**i)) % 16) for i in range(buffer_size)])[::-1]
     
     def __str__(self) -> str:
-        return "send syscall has not been configured"
+        return f"Sent '{self.data}' on Port {self.port}"
 
 
-class RecvSyscall(Syscall):
+class RecvFromSyscall(Syscall):
+    family: int
     ip_addr: str
     port: int
-    data: str
-    flags: int
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
-        pass
+        size = get_reg_value(inst, "r9")
+        value = get_reg_value(inst, "r8", size)
+        self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
-        return "recv syscall has not been configured"
+        return f"Recieved Data on Port {self.port}"
 
 
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
