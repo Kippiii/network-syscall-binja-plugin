@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import List, Tuple, Optional
 
 from binaryninja.plugin import PluginCommand
 from binaryninja import LowLevelILOperation, LowLevelILInstruction, RegisterValue
@@ -8,10 +8,10 @@ class NotNetworkSyscallException(Exception):
     pass
 
 
-def get_reg_value(inst: LowLevelILInstruction, reg_name: str, size: int = 8) -> int:
+def get_reg_value(inst: LowLevelILInstruction, reg_name: str, size: int = 8) -> Optional[int]:
     reg = inst.get_reg_value(reg_name)
     if reg.type == 0:
-        return "Unknown"
+        return None
     if reg.type == 2:
         return reg.value
     if reg.type == 5:
@@ -19,8 +19,8 @@ def get_reg_value(inst: LowLevelILInstruction, reg_name: str, size: int = 8) -> 
     assert False, f"Given reg type of {reg.type} is unsupported here"
 
 
-def parse_sockaddr(value: Union[int, str]) -> Tuple[int, int, str]:
-    if value == "Unknown":
+def parse_sockaddr(value: Optional[int]) -> Tuple[int, int, str]:
+    if value is None:
         return -1, -1, ""
     family = value & 0xf
     port = (value & 0xffff0000) >> 16
@@ -64,9 +64,9 @@ class Syscall:
 
 
 class SocketSyscall(Syscall):
-    domain: int
-    type: int
-    protocol: int
+    domain: Optional[int]
+    type: Optional[int]
+    protocol: Optional[int]
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         self.domain = get_reg_value(inst, "rdi")
@@ -74,6 +74,8 @@ class SocketSyscall(Syscall):
         self.protocol = get_reg_value(inst, "rdx")
 
     def __str__(self) -> str:
+        if self.protocol != 0 or self.type not in (1, 2):
+            return "Created Socket of Unknown Type"
         network_proc = "TCP" if self.type == 1 else "UDP"
         return f"Created {network_proc} Socket"
 
@@ -85,7 +87,10 @@ class BindSyscall(Syscall):
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         size = get_reg_value(inst, "rdx")
-        value = get_reg_value(inst, "rsi", size)
+        if size is not None:
+            value = get_reg_value(inst, "rsi", size)
+        else:
+            value = None
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
@@ -94,13 +99,13 @@ class BindSyscall(Syscall):
 
 
 class ListenSyscall(Syscall):
-    backlog: int
+    backlog: Optional[int]
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         self.backlog = get_reg_value(inst, "rsi", 4)
 
     def __str__(self) -> str:
-        return f"Listening with Backlog={self.backlog}"
+        return f"Listening with Backlog={self.backlog if self.backlog is not None else 'Unknown'}"
 
 
 class AcceptSyscall(Syscall):
@@ -110,7 +115,7 @@ class AcceptSyscall(Syscall):
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         size = get_reg_value(inst, "rdx")
-        value = get_reg_value(inst, "rsi", size)
+        value = get_reg_value(inst, "rsi", size) if size is not None else None
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
@@ -125,7 +130,7 @@ class ConnectSyscall(Syscall):
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         size = get_reg_value(inst, "rdx")
-        value = get_reg_value(inst, "rsi", size)
+        value = get_reg_value(inst, "rsi", size) if size is not None else None
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
     
     def __str__(self) -> str:
@@ -137,18 +142,20 @@ class SendToSyscall(Syscall):
     family: int
     ip_addr: str
     port: int
-    data: str
+    data: Optional[str]
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         buffer_size = get_reg_value(inst, "rdx")
-        buffer = get_reg_value(inst, "rsi", buffer_size)
+        buffer = get_reg_value(inst, "rsi", buffer_size) if buffer_size is not None else None
         size = get_reg_value(inst, "r9")
-        value = get_reg_value(inst, "r8", size)
+        value = get_reg_value(inst, "r8", size) if size is not None else None
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
-        self.data = ''.join([chr((buffer // (16**i)) % 16) for i in range(buffer_size)])[::-1]
+        self.data = ''.join([chr((buffer // (16**i)) % 16) for i in range(buffer_size)])[::-1] if buffer is not None else None
     
     def __str__(self) -> str:
-        return f"Sent '{self.data}' on Port {self.port}"
+        port_str = self.port if self.port != -1 else "Unknown"
+        data_str = self.data if self.data is not None else "Unknown"
+        return f"Sent '{data_str}' on Port {port_str}"
 
 
 class RecvFromSyscall(Syscall):
@@ -158,11 +165,12 @@ class RecvFromSyscall(Syscall):
 
     def __init__(self, inst: LowLevelILInstruction) -> None:
         size = get_reg_value(inst, "r9")
-        value = get_reg_value(inst, "r8", size)
+        value = get_reg_value(inst, "r8", size) if size is not None else None
         self.family, self.port, self.ip_addr = parse_sockaddr(value)
 
     def __str__(self) -> str:
-        return f"Recieved Data on Port {self.port}"
+        port_str = self.port if self.port != -1 else "Unknown"
+        return f"Recieved Data on Port {port_str}"
 
 
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
