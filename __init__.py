@@ -66,6 +66,8 @@ class Syscall:
             42: ConnectSyscall,
             44: SendToSyscall,
             45: RecvFromSyscall,
+            46: SendMsgSyscall,
+            47: RecvMsgSyscall,
         }
         sys_num = get_reg_value(inst, "rax")
         if sys_num not in syscall_map:
