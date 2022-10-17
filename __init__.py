@@ -278,6 +278,46 @@ class RecvFromSyscall(Syscall):
         port_str = self.port if self.port != -1 else "Unknown"
         return f"Recieved Data on Port {port_str}"
 
+class SendMsgSyscall(Syscall):
+    """
+    Represents an instance of the sendmsg syscall
+
+    :param struct: The value of the user_msghdr struct
+    """
+    struct: Optional[int]
+
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        self.struct = get_reg_value(inst, "rsi", 56)
+
+    def __str__(self) -> str:
+        """
+        Creates the string for the sendmsg syscall
+
+        :return: The string used for the comment
+        """
+        struct_str = hex(self.struct) if self.struct is not None else "Unknown"
+        return f"Sent Data with Msg Struct of {struct_str}"
+
+class RecvMsgSyscall(Syscall):
+    """
+    Representsan instance of the recvmsg syscall
+
+    :param struct: The value of the user_msghdr struct
+    """
+    struct: Optional[int]
+
+    def __init__(self, inst: LowLevelILInstruction) -> None:
+        self.struct = get_reg_value(inst, "rsi", 56)
+    
+    def __str__(self) -> str:
+        """
+        Creates the string for the recvmsg syscall
+
+        :return: The string used for the comment
+        """
+        struct_str = hex(self.struct) if self.struct is not None else "Unknown"
+        return f"Recieved Data with Msg Struct of {struct_str}"
+
 
 def get_syscall_instructions(bv) -> List[LowLevelILInstruction]:
     """
